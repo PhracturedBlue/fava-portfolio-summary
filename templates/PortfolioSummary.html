@@ -1,0 +1,41 @@
+{% import 'macros/_account_macros.html' as account_macros %}
+{% import 'macros/_commodity_macros.html' as commodity_macros %}
+
+<h2>Portfolio Summary Report</h2>
+<br />
+{% for title, data in extension.portfolio_accounts() %}
+  {% set types = data[0] %}
+  {% set rows = data[1] %}
+  <h3>{{title}}</h3>
+  <tree-table>
+    <ol class="flex-table tree-table" title="{{ _('Hold Shift while clicking to expand all children.') }}">
+      <li class="head">
+        <p>
+          <span class="account-cell"><button type="button" class="link expand-all hidden" title="{{ _('Expand all accounts') }}">{{ _('Expand all') }}</button></span>
+          {% for name, type in types %}
+          {% if name != "account" %}
+          <span class="num">{{ name }}</span>
+          {% endif %}
+          {% endfor %}
+        </p>
+      </li>
+      {% for row in rows recursive %}
+      <li{{ ' class=toggled' if loop.depth0 == 1 else '' }}>
+        <p>
+          <span class="account-cell depth-{{ loop.depth0 }} droptarget{{ ' has-children' if row.children else '' }}" data-account-name="{{ row.account }}">
+            {{ account_macros.account_name(ledger, row.account, last_segment=(loop.depth0 > 1)) }}
+          </span>
+          {% for name, type in types %}
+          {% if name != "account" %}
+            <span class="num"> {{ ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+          {% endif %}
+          {% endfor %}
+        </p>
+      {% if row.children %}
+      <ol>{{ loop(row.children) }}</ol>
+      {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </tree-table>
+{% endfor %}
