@@ -32,7 +32,8 @@ In the beancount file, configure via:
   * `account-groups`: Either a string or a dictionary with the `name` key identifying the name of the group
     * If specified as a dictionary, the `ineternal`, `mwr` and `twr` keys can be specied on a per-group basis
   * `internal` (optional): List of regex patterns denoting 'internal' accounts that should be ignored for cash-flow purposes
-    during MWRR/TWRR calculation
+    during MWRR/TWRR calculation.  More information about selecting internal accounts can be found
+    [here](https://github.com/hoostus/portfolio-returns#external-vs-internal-cashflows)
   * `mwr` (optional): Enable MWRR calculation for all accounts (can be overridden at the group level).
     Possible values: (True, False, 'children') Defaults to *True*
   * `twr` (optional): Enable TWRR calculation for all accounts (can be overridden at the group level).
@@ -45,3 +46,7 @@ Additionally each top-level account (that is to be displayed) needs to be marked
 ```
 For each top level account, all transactions of the account and any child accounts will be considered (I.e. for the example above,
 `Assets:Investments:Fidelity401k:PreTax` and any accouunt matching `Assets:Investments:Fidelity401k:PreTax:.*` will be summarized)
+
+## Related Projects
+  * https://github.com/hoostus/portfolio-returns
+  * https://github.com/seltzered/fava-classy-portfolio
