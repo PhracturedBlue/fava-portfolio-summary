@@ -229,7 +229,7 @@ class IRR:
             self.internal_patterns = re.compile(fr'^(?:{ "|".join(internal_patterns) })$')
         else:
             self.internal_patterns = re.compile('^$')
-        self.patterns = re.compile(fr'^(?:{ "|".join(patterns) })$''|'.join(patterns))
+        self.patterns = re.compile(fr'^(?:{ "|".join(patterns) })$')
 
         elapsed[1] = time.time()
         only_txns = beancount.core.data.filter_txns(self.all_entries)
