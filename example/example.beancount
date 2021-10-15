@@ -1,0 +1,122 @@
+option "title" "Example Beancount file"
+option "operating_currency" "USD"
+
+2010-01-01 custom "fava-extension" "portfolio_summary" "{
+    'metadata-key': 'portfolio',
+    'account-groups': (
+        { 'name': 'cash', 'mwr': False, 'twr': False },
+        'pretax',
+        'roth'),
+    'internal': ('.*:PnL',),
+    'twr': True,
+    'mwr': 'children',
+    }"
+
+1792-01-01 commodity USD
+2015-12-01 commodity ABC
+2015-12-01 commodity XYZ
+
+2015-12-01 price ABC       10.00 USD
+2016-01-01 price ABC       11.00 USD
+2016-06-01 price ABC        9.00 USD
+2016-12-01 price ABC       12.00 USD
+2017-06-01 price ABC       15.00 USD
+2017-12-01 price ABC       22.00 USD
+2017-12-31 price ABC       20.00 USD
+
+2015-12-01 price XYZ       100.00 USD
+2016-01-01 price XYZ        90.00 USD
+2016-06-01 price XYZ        80.00 USD
+2016-12-01 price XYZ        70.00 USD
+2017-06-01 price XYZ       100.00 USD
+2017-12-01 price XYZ       110.00 USD
+2017-12-31 price XYZ       115.00 USD
+
+2015-12-01 open Income:PnL
+2015-12-01 open Equity:Opening-Balances
+
+2015-12-01 open Assets:Cash
+    portfolio: "cash"
+2015-12-01 open Assets:Brokerage1:PreTax
+    portfolio: "pretax"
+2015-12-01 open Assets:Brokerage1:PreTax:ABC
+2015-12-01 open Assets:Brokerage1:PreTax:XYZ
+
+2015-12-01 open Assets:Brokerage1:Roth
+    portfolio: "roth"
+2015-12-01 open Assets:Brokerage1:Roth:ABC
+2015-12-01 open Assets:Brokerage1:Roth:XYZ
+
+2015-12-01 open Assets:Brokerage2:PreTax
+    portfolio: "pretax"
+2015-12-01 open Assets:Brokerage2:Roth
+    portfolio: "roth"
+
+2015-12-01 * "Opening balance"
+    Assets:Cash           1,000,000 USD
+    Equity:Opening-Balances
+
+2015-12-01 * "Opening balance"
+    Assets:Brokerage1:Roth:XYZ   1000 XYZ {10 USD}
+    Equity:Opening-Balances
+
+2015-12-01 * "Opening balance"
+    Assets:Brokerage1:PreTax:ABC 1000 ABC { 10 USD}
+    Equity:Opening-Balances
+
+2015-12-01 * "Opening balance"
+    Assets:Brokerage2:PreTax     1000 ABC { 5 USD }
+    Equity:Opening-Balances
+
+2015-12-01 * "Opening balance"
+    Assets:Brokerage2:Roth       1000 XYZ { 50 USD }
+    Equity:Opening-Balances
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+2016-01-01 * "Buy 1000 shares"
+    Assets:Brokerage1:Roth:ABC      1000 ABC {11 USD}
+    Assets:Cash
+
+2016-06-01 * "Buy 1000 shares"
+    Assets:Brokerage1:PreTax:XYZ    1000 XYZ {80 USD}
+    Assets:Cash
+
+2016-12-01 * "Buy 500 shares"
+    Assets:Brokerage2:PreTax      500 ABC {12 USD}
+    Assets:Cash
+
+2017-06-01 * "Buy 200 shares"
+    Assets:Brokerage2:PreTax      200 ABC {15 USD}
+    Assets:Cash
+
+2017-12-01 * "Sell 5000 shares, Buy 100 Shares"
+    Assets:Brokerage2:Roth        -500 XYZ {50 USD} @ 110 USD
+    Assets:Brokerage2:Roth         2500 ABC {22 USD}
+    Income:PnL                    -30,000 USD
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+2018-01-01 * "Closeout account"
+    Assets:Brokerage1:PreTax:ABC      -1000 ABC {10 USD} @ 20 USD
+    Assets:Brokerage1:PreTax:XYZ      -1000 XYZ {80 USD} @ 115 USD
+    Income:PnL                        -45,000 USD
+    Assets:Cash
+
+2018-01-01 * "Closeout account"
+    Assets:Brokerage1:Roth:ABC      -1000 ABC {11 USD} @ 20 USD
+    Assets:Brokerage1:Roth:XYZ      -1000 XYZ {10 USD} @ 115 USD
+    Income:PnL                      -114,000 USD
+    Assets:Cash
+
+2018-01-01 * "Closeout account"
+    Assets:Brokerage2:PreTax        -1000 ABC {5 USD} @ 20 USD
+    Assets:Brokerage2:PreTax        -500  ABC {12 USD} @ 20 USD
+    Assets:Brokerage2:PreTax        -200  ABC {15 USD} @ 20 USD
+    Income:PnL                      -114,000 USD
+    Assets:Cash
+
+2018-01-01 * "Closeout account"
+    Assets:Brokerage2:Roth          -2500 ABC {22 USD} @ 20 USD
+    Assets:Brokerage2:Roth          -500  XYZ {50 USD} @ 115 USD
+    Income:PnL                      -27,000 USD
+    Assets:Cash

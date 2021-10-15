@@ -56,8 +56,8 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         _t0 = time.time()
         self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency)
         for key, pattern, internal, mwr, twr in self.parse_config():
-            any_mwr |= mwr
-            any_twr |= twr
+            any_mwr |= bool(mwr)
+            any_twr |= bool(twr)
             try:
                 portfolio = self._account_metadata_pattern(tree, key, pattern, internal, mwr, twr)
             except Exception as _e:
@@ -93,6 +93,10 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             raise FavaAPIException("Portfolio List: 'internal' must be a list.")
         mwr = self.config.get('mwr', True)
         twr = self.config.get('twr', False)  # TWR is expensive to calculate
+        if isinstance(mwr, str) and mwr != "children":
+            raise FavaAPIException("Portfolio List: 'mwr' must be one of (True, False, 'children')")
+        if isinstance(twr, str) and twr != "children":
+            raise FavaAPIException("Portfolio List: 'twr' must be one of (True, False, 'children')")
         for group in self.config['account-groups']:
             grp_internal = internal.copy()
             grp_mwr = mwr
@@ -201,13 +205,17 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
                     continue
                 parent['balance'] += row['balance']
                 parent['cost'] += row['cost']
+                if mwr == "children" or twr == "children":
+                    row['mwr'], row['twr'] = self._calculate_irr_twr(
+                        [row['account']], internal, mwr == "children", twr == "children")
                 parent['children'].append(row)
                 rows.append(row)
             total['balance'] += parent['balance']
             total['cost'] += parent['cost']
             if mwr or twr:
-                mwr_accounts.add(parent['account'] + ':.*')
-                parent['mwr'], parent['twr'] = self._calculate_irr_twr([parent['account'] + ':.*'], internal, mwr, twr)
+                pattern = parent['account'] + '(:.*)?'
+                mwr_accounts.add(pattern)
+                parent['mwr'], parent['twr'] = self._calculate_irr_twr([pattern], internal, mwr, twr)
 
         for row in rows:
             if "balance" in row and total['balance'] > 0:

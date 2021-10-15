@@ -27,7 +27,7 @@
           </span>
           {% for name, type in types %}
           {% if name != "account" %}
-            <span class="num"> {{ ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+            <span class="num"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
           {% endif %}
           {% endfor %}
         </p>

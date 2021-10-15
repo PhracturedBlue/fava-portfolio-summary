@@ -189,13 +189,13 @@ class IRR:
     def is_interesting_posting(self, posting):
         """ Is this posting for an account we care about? """
         if posting.account not in self.interesting:
-            self.interesting[posting.account] = bool(self.patterns.match(posting.account))
+            self.interesting[posting.account] = bool(self.patterns.search(posting.account))
         return self.interesting[posting.account]
 
     def is_internal_account(self, posting):
         """ Is this an internal account that should be ignored? """
         if posting.account not in self.internal:
-            self.internal[posting.account] = bool(self.internal_patterns.match(posting.account))
+            self.internal[posting.account] = bool(self.internal_patterns.search(posting.account))
         return self.internal[posting.account]
 
     def is_interesting_entry(self, entry):
@@ -226,11 +226,10 @@ class IRR:
         elapsed = [0, 0, 0, 0, 0, 0, 0, 0]
         elapsed[0] = time.time()
         if internal_patterns:
-            self.internal_patterns = re.compile('|'.join(internal_patterns))
+            self.internal_patterns = re.compile(fr'^(?:{ "|".join(internal_patterns) })$')
         else:
             self.internal_patterns = re.compile('^$')
-        #patterns = [re.compile(_) for _ in patterns]
-        self.patterns = re.compile('|'.join(patterns))
+        self.patterns = re.compile(fr'^(?:{ "|".join(patterns) })$''|'.join(patterns))
 
         elapsed[1] = time.time()
         only_txns = beancount.core.data.filter_txns(self.all_entries)
@@ -412,6 +411,7 @@ def main():
     outflow_accounts = set()
     irr, twr = IRR(entries, price_map, args.currency).calculate(
         args.account, internal_patterns=args.internal, start_date=args.date_from, end_date=args.date_to,
+        mwr=True, twr=True,
         cashflows=cashflows, inflow_accounts=inflow_accounts, outflow_accounts=outflow_accounts)
     if irr:
         print(f"IRR: {irr}")

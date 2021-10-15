@@ -8,6 +8,8 @@ partial balances.
 
 The MWRR (and especially TWRR) calculations can be very slow to calculate.  By default, MWRR is enabled, and TWRR is disabled
 
+![Screenshot](example/PortfolioSummary.png)
+
 ## Configuration
 In the beancount file, configure via:
 ```
@@ -22,7 +24,7 @@ In the beancount file, configure via:
       '.*:PnL',
       'Income:Investments:Dividends',
       'Income:Bank:Interest'),
-    'mwr': True,
+    'mwr': 'children',
     'twr': False,
     }"
 ```
@@ -31,8 +33,10 @@ In the beancount file, configure via:
     * If specified as a dictionary, the `ineternal`, `mwr` and `twr` keys can be specied on a per-group basis
   * `internal` (optional): List of regex patterns denoting 'internal' accounts that should be ignored for cash-flow purposes
     during MWRR/TWRR calculation
-  * `mwr` (optional): Enable MWRR calculation for all accounts (can be overridden at the group level).  Defaults to *True*
-  * `twr` (optional): Enable TWRR calculation for all accounts (can be overridden at the group level).  Defaults to *False*
+  * `mwr` (optional): Enable MWRR calculation for all accounts (can be overridden at the group level).
+    Possible values: (True, False, 'children') Defaults to *True*
+  * `twr` (optional): Enable TWRR calculation for all accounts (can be overridden at the group level).
+    Possible values: (True, False, 'children') Defaults to *False*
 
 Additionally each top-level account (that is to be displayed) needs to be marked with the appropriate group:
 ```
