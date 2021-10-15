@@ -229,6 +229,7 @@ class IRR:
             self.internal_patterns = re.compile(fr'^(?:{ "|".join(internal_patterns) })$')
         else:
             self.internal_patterns = re.compile('^$')
+       
         self.patterns = re.compile(fr'^(?:{ "|".join(patterns) })$')
 
         elapsed[1] = time.time()
@@ -269,7 +270,7 @@ class IRR:
                 converted = beancount.core.convert.convert_position(posting, self.currency, self.price_map, entry.date)
                 if converted.currency != self.currency:
                     logging.error(f'Could not convert posting {converted} from {entry.date} on line '
-                                   '{posting.meta["lineno"]} to {self.currency}. IRR will be wrong.')
+                                  f'{posting.meta["lineno"]} to {self.currency}. IRR will be wrong.')
                     continue
                 value = converted.number
 
