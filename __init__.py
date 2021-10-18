@@ -22,13 +22,13 @@ from fava.ext import FavaExtensionBase
 from fava.helpers import FavaAPIException
 from fava.core.conversion import cost_or_value
 from fava.context import g
-from portfolio_summary.irr import IRR
+from .irr import IRR
 
 
 class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
     """Report out summary information for groups of portfolios"""
 
-    report_title = "Portfolio List"
+    report_title = "Portfolio Summary"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -236,4 +236,6 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             mwr = round(100 * mwr, 2)
         if twr:
             twr = round(100 * twr, 2)
+        print(patterns)
+        print(f'mwr: {mwr} twr: {twr}')
         return mwr, twr

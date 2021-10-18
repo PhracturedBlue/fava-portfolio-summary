@@ -22,7 +22,6 @@ from pprint import pprint
 
 from decimal import Decimal
 from dateutil.relativedelta import relativedelta
-from scipy import optimize
 import beancount.loader
 import beancount.utils
 import beancount.core
@@ -32,6 +31,17 @@ import beancount.core.convert
 import beancount.parser
 
 # https://github.com/peliot/XIRR-and-XNPV/blob/master/financial.py
+try:
+    from scipy.optimize import newton as secant_method
+except:
+    def secant_method(f, x0, tol=0.0001):
+        """
+        Solve for x where f(x)=0, given starting x0 and tolerance.
+        """
+        x1 = x0*1.1
+        while (abs(x1-x0)/abs(x1) > tol):
+            x0, x1 = x1, x1-f(x1)*(x1-x0)/(f(x1)-f(x0))
+        return x1
 
 def xnpv(rate,cashflows):
     """
@@ -85,7 +95,11 @@ def xirr(cashflows,guess=0.1):
       function does not fail gracefully in cases where there is no solution, so the scipy.optimize.newton version is
       preferred.
     """
-    return optimize.newton(lambda r: xnpv(r,cashflows),guess)
+    try:
+        return secant_method(lambda r: xnpv(r,cashflows),guess)
+    except:
+        logging.error("No solution found for IRR")
+        return 0.0
 
 def xtwrr(periods):
     """Calculate TWRR from a set of date-ordered periods"""
@@ -269,8 +283,9 @@ class IRR:
             for posting in entry.postings:
                 converted = beancount.core.convert.convert_position(posting, self.currency, self.price_map, entry.date)
                 if converted.currency != self.currency:
-                    logging.error(f'Could not convert posting {converted} from {entry.date} on line '
-                                  f'{posting.meta["lineno"]} to {self.currency}. IRR will be wrong.')
+                    logging.error(f'Could not convert posting {converted} from {entry.date} at '
+                                  f'{posting.meta["filename"]}:{posting.meta["lineno"]} to {self.currency}. '
+                                   'IRR will be wrong.')
                     continue
                 value = converted.number
 
