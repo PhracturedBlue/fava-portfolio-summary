@@ -10,6 +10,12 @@ The MWRR (and especially TWRR) calculations can be very slow to calculate.  By d
 
 ![Screenshot](example/PortfolioSummary.png)
 
+## Installation
+Assuming Fava is already installed, use:
+```
+pip install git+https://github.com/PhracturedBlue/fava-portfolio-summary
+```
+
 ## Configuration
 In the beancount file, configure via:
 ```

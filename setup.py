@@ -17,6 +17,7 @@ setup(
     license='MIT',
     keywords='fava beancount accounting investment mwrr mwr twrr twr irr',
     packages=find_packages(),
+    package_dir={'fava_portfolio_summary': '.'},
     include_package_data=True,
     install_requires=[
         'beancount>=2.3.4',
