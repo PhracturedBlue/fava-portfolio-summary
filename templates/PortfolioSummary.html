@@ -1,6 +1,21 @@
 {% import 'macros/_account_macros.html' as account_macros %}
 {% import 'macros/_commodity_macros.html' as commodity_macros %}
 
+<style>
+  .tree-table .num.PnL.positive {
+    color: var(--budget-positive);
+  }
+
+  .tree-table .num.PnL.negative {
+    color: var(--budget-negative);
+  }
+
+  .tree-table .num .date {
+    font-style: italic;
+    font-size: x-small;
+  }
+</style>
+
 <h2>Portfolio Summary Report</h2>
 <br />
 {% for title, data in extension.portfolio_accounts() %}
@@ -27,7 +42,13 @@
           </span>
           {% for name, type in types %}
           {% if name != "account" %}
+            {% if name != "PnL" and name != "balance" %}
             <span class="num"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+            {% elif name == "balance" %}
+            <span class="num">{{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}{% if row['last-date'] != None %}<br><span class="date">({{row['last-date']}})</span>{% endif %}</span>
+            {% elif name == "PnL" and row[name] >=0 %} <span class="num PnL positive"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+            {% elif name == "PnL" and row[name] <=0 %} <span class="num PnL negative"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+            {% endif %}
           {% endif %}
           {% endfor %}
         </p>
