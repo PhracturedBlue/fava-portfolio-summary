@@ -42,7 +42,6 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         self.irr = None
         self.total = None
         self.operating_currency = None
-        self.other_currencies = None
 
     def portfolio_accounts(self):
         """An account tree based on matching regex patterns."""
@@ -98,8 +97,6 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             if key not in keys:
                 raise FavaAPIException(f"Portfolio List: '{key}' is an invalid key.")
         internal = self.config.get('internal', set())
-        #### ADD OTHER CURRENCIES TO THE REPORT
-        self.other_currencies = self.config.get('other-currencies',set())
         if isinstance(internal, (tuple, list)):
             internal = set(internal)
         elif not isinstance(internal, set):
@@ -178,11 +175,13 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
 
     def _process_dividends(self,account,currency):
         parent_name = ":".join(account.name.split(":")[:-1])
-        result = self.ledger.query_shell.execute_query("select SUM(CONVERT(COST(position),'"+self.operating_currency+"')) AS dividends from HAS_ACCOUNT('Dividend') and HAS_ACCOUNT('"+parent_name+"') where LEAF(account) = '"+currency+"'")
+        result = self.ledger.query_shell.execute_query("select SUM(CONVERT(COST(position),'"+
+        self.operating_currency+"')) AS dividends from HAS_ACCOUNT('"+currency+"') and \
+            HAS_ACCOUNT('"+parent_name+"') where LEAF(account) = 'Dividends'")
         dividends = ZERO
         if len(result[2])>0:
             for row_cost in result[2]:
-                if len(row_cost.dividends.get_positions())==1: 
+                if len(row_cost.dividends.get_positions())==1:
                     dividends+=round(abs(row_cost.dividends.get_positions()[0].units.number),2)
         return dividends
 
@@ -197,18 +196,15 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         date=self.ledger.end_date
         balance = cost_or_value(node.balance, "at_value", g.ledger.price_map, date=date)
         cost = cost_or_value(node.balance, "at_cost", g.ledger.price_map, date=date)
-        
         #### ADD Units to the report
         units = cost_or_value(node.balance, "units", g.ledger.price_map, date=date)
-
-        
-        ### Get row currency 
+        ### Get row currency
         row_currency = None
         if len(list(units.values())) > 0:
             row["units"] = list(units.values())[0]
             row_currency = list(units.keys())[0]
         #### END of UNITS
-        if row_currency != None and row_currency not in self.ledger.options["operating_currency"]:
+        if row_currency is not None and row_currency not in self.ledger.options["operating_currency"]:
             row['Dividends'] = self._process_dividends(node,row_currency)
 
         if self.operating_currency in balance and self.operating_currency in cost:
@@ -216,12 +212,15 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             cost_dec = round(cost[self.operating_currency], 2)
             row["balance"] = balance_dec
             row["cost"] = cost_dec
-        
+
         #### ADD other Currencies
-        elif self.other_currencies[0] in balance and self.other_currencies[0] in cost:
+        elif row_currency is not None and self.operating_currency not in balance and self.operating_currency not in cost:
             total_currency_cost = ZERO
             total_currency_value = ZERO
-            result = self.ledger.query_shell.execute_query("SELECT convert(cost(position),'"+self.operating_currency+"',cost_date) as cost, convert(value(position) ,'"+self.operating_currency+"',today()) as value WHERE currency = '"+row_currency+"' and account ='"+node.name+"' ORDER BY currency, cost_date")
+            
+            result = self.ledger.query_shell.execute_query("SELECT convert(cost(position),'"+self.operating_currency+"',cost_date) as cost, \
+            convert(value(position) ,'"+self.operating_currency+"',today()) as value WHERE currency = '"+row_currency+"' and account ='"+node.name+"' \
+                ORDER BY currency, cost_date")
             if len(result) == 3:
                 for row_cost,row_value in result[2]:
                     total_currency_cost+=row_cost.number
@@ -230,7 +229,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             row["cost"] = round(total_currency_cost, 2)
 
         ### GET LAST CURRENCY PRICE DATE
-        if row_currency!= None and row_currency != self.operating_currency:
+        if row_currency is not None and row_currency != self.operating_currency:
             dict_dates = g.ledger.prices(self.operating_currency,row_currency)
             if len(dict_dates) >0:
                 row["last-date"] = dict_dates[-1][0]
@@ -291,11 +290,10 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             if "balance" in row and total['balance'] > 0:
                 row["allocation"] = round((row["balance"] / total['balance']) * 100, 2)
                 row["change"] = round((float(row['balance'] - row['cost']) / (float(row['cost'])+.00001)) * 100, 2)
-                row["PnL"] = round(float(row['balance'] - row['cost']),2) 
+                row["PnL"] = round(float(row['balance'] - row['cost']),2)
         self.total['balance'] += total['balance']
         self.total['cost'] += total['cost']
         self.total['Dividends'] += total['Dividends']
-        
         if mwr or twr:
             total['mwr'], total['twr'] = self._calculate_irr_twr(mwr_accounts, internal, mwr, twr)
             self.all_mwr_accounts |= mwr_accounts
@@ -309,6 +307,5 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             mwr = round(100 * mwr, 2)
         if twr:
             twr = round(100 * twr, 2)
-        print(patterns)
         print(f'mwr: {mwr} twr: {twr}')
         return mwr, twr
