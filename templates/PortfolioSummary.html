@@ -40,21 +40,16 @@
       <p>
         <span class="account-cell depth-{{ loop.depth0 }} droptarget{{ ' has-children' if row.children else '' }}" data-account-name="{{ row.account }}"> {{ account_macros.account_name(ledger, row.account, last_segment=(loop.depth0 > 1)) }}</span>
         {% for name, type in types %}
-            {% if name != "account" %}
-                {% if name != "PnL" and name != "balance" %}
-                    <span class="num"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
-                {% elif name == "balance" %}
-                    <span class="num">
-                      {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}
-                      {% if row['last-date'] != None %}
-                          <br><span class="date">({{row['last-date']}})</span>
-                      {% endif %}
-                    </span>
-                {% elif name == "PnL" and row[name] >=0 %} <span class="num PnL positive"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
-                {% elif name == "PnL" and row[name] <=0 %} <span class="num PnL negative"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
-                {% endif %}
-              {% endif %}
-          {% endfor %}
+        {% if name != "account" %}
+          {% if name != "PnL" and name != "balance" %}
+          <span class="num"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+          {% elif name == "balance" %}
+          <span class="num">{{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}{% if row['last-date'] != None %}<br><span class="date">({{row['last-date']}})</span>{% endif %}</span>
+          {% elif name == "PnL" and row[name] >=0 %} <span class="num PnL positive"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+          {% elif name == "PnL" and row[name] <=0 %} <span class="num PnL negative"> {{ '' if not row[name] else ('{}%' if type == 'Percent' else '{:,}').format(row[name]) }}</span>
+          {% endif %}
+        {% endif %}
+        {% endfor %}
       </p>
       {% if row.children %}
         <ol>{{ loop(row.children) }}</ol>
