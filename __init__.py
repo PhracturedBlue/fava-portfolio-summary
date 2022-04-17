@@ -230,7 +230,10 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
 
         ### GET LAST CURRENCY PRICE DATE
         if row_currency is not None and row_currency != self.operating_currency:
-            dict_dates = g.ledger.prices(self.operating_currency,row_currency)
+            try:
+                dict_dates = g.ledger.prices(self.operating_currency,row_currency)
+            except KeyError:
+                dict_dates = g.ledger.prices('USD',row_currency)
             if len(dict_dates) >0:
                 row["last-date"] = dict_dates[-1][0]
         return row
