@@ -230,6 +230,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
 
         ### GET LAST CURRENCY PRICE DATE
         if row_currency is not None and row_currency != self.operating_currency:
+            #TODO: handle multi currency trades
             try:
                 dict_dates = g.ledger.prices(self.operating_currency,row_currency)
             except KeyError:
