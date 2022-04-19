@@ -16,8 +16,9 @@ setup(
     author_email='rc2012@pblue.org',
     license='MIT',
     keywords='fava beancount accounting investment mwrr mwr twrr twr irr',
-    packages=find_packages(),
+    packages=['fava_portfolio_summary'],
     package_dir={'fava_portfolio_summary': '.'},
+    package_data={'': ['templates/PortfolioSummary.html']},
     include_package_data=True,
     install_requires=[
         'beancount>=2.3.4',

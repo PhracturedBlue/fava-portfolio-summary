@@ -19,7 +19,7 @@ pip install git+https://github.com/PhracturedBlue/fava-portfolio-summary
 ## Configuration
 In the beancount file, configure via:
 ```
-2000-01-01 custom "fava-extension" "portfolio_summary" "{
+2000-01-01 custom "fava-extension" "fava_portfolio_summary" "{
     'metadata-key': 'portfolio',
     'account-groups': (
         { 'name': 'cash', 'mwr': False },
