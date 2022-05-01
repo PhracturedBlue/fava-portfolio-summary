@@ -33,15 +33,16 @@ from fava.helpers import BeancountError
 
 # https://github.com/peliot/XIRR-and-XNPV/blob/master/financial.py
 try:
-    from scipy.optimize import newton as secant_method
-except:
+    from scipy.optimize import newton as secant_method  # pylint: disable=import-error
+except Exception:
     def secant_method(f, x0, tol=0.0001):
         """
         Solve for x where f(x)=0, given starting x0 and tolerance.
         """
-        x1 = x0*1.1
-        while (abs(x1-x0)/abs(x1) > tol):
-            x0, x1 = x1, x1-f(x1)*(x1-x0)/(f(x1)-f(x0))
+        # pylint: disable=invalid-name
+        x1 = x0 * 1.1
+        while abs(x1 - x0)/abs(x1) > tol:
+            x0, x1 = x1, x1 - f(x1) * (x1 - x0)/(f(x1) - f(x0))
         return x1
 
 def xnpv(rate,cashflows):
@@ -165,7 +166,7 @@ class IRR:
 
     def _error(self, msg, meta=None):
         if self.errors:
-            if not any(_.source == meta and _.message == msg and _.entry == None for _ in self.errors):
+            if not any(_.source == meta and _.message == msg and _.entry is None for _ in self.errors):
                 self.errors.append(BeancountError(meta, msg, None))
 
     def elapsed(self):
@@ -265,7 +266,7 @@ class IRR:
             self.internal_patterns = re.compile(fr'^(?:{ "|".join(internal_patterns) })$')
         else:
             self.internal_patterns = re.compile('^$')
-       
+
         self.patterns = re.compile(fr'^(?:{ "|".join(patterns) })$')
 
         elapsed[1] = time.time()

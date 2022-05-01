@@ -186,6 +186,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         return dividends
 
     def _process_node(self, node):
+        # pylint: disable=too-many-locals
         row = {}
 
         row["account"] = node.name
@@ -214,13 +215,17 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             row["cost"] = cost_dec
 
         #### ADD other Currencies
-        elif row_currency is not None and self.operating_currency not in balance and self.operating_currency not in cost:
+        elif (row_currency is not None and self.operating_currency not in balance
+                and self.operating_currency not in cost):
             total_currency_cost = ZERO
             total_currency_value = ZERO
 
-            result = self.ledger.query_shell.execute_query("SELECT convert(cost(position),'"+self.operating_currency+"',cost_date) as cost, \
-            convert(value(position) ,'"+self.operating_currency+"',today()) as value WHERE currency = '"+row_currency+"' and account ='"+node.name+"' \
-                ORDER BY currency, cost_date")
+            result = self.ledger.query_shell.execute_query(
+                "SELECT "
+                f"convert(cost(position),'{self.operating_currency}',cost_date) AS cost, "
+                f"convert(value(position) ,'{self.operating_currency}',today()) AS value "
+                f"WHERE currency = '{row_currency}' AND account ='{node.name}' "
+                "ORDER BY currency, cost_date")
             if len(result) == 3:
                 for row_cost,row_value in result[2]:
                     total_currency_cost+=row_cost.number
