@@ -33,6 +33,7 @@ from .irr import IRR
 
 class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
     """Report out summary information for groups of portfolios"""
+    # pylint: disable=too-many-instance-attributes
 
     report_title = "Portfolio Summary"
 
@@ -42,10 +43,20 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         self.irr = None
         self.total = None
         self.operating_currency = None
+        self.irr_cache = {}
+        self.dividends_elapsed = 0
+        self.dividend_cache = {}
+        self.accounts = None
         self.all_cols = ["units", "cost", "balance", "pnl", "dividends", "change", "mwr", "twr", "allocation"]
 
     def portfolio_accounts(self):
         """An account tree based on matching regex patterns."""
+
+        if self.ledger.accounts is not self.accounts:
+            # self.ledger.accounts should be reset every time the databse is loaded
+            self.dividend_cache = {}
+            self.irr_cache = {}
+            self.accounts = self.ledger.accounts
         self.operating_currency = self.ledger.options["operating_currency"][0]
         self.total = {
             'account': 'Total',
@@ -60,6 +71,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             'last-date':None
             }
         self.all_mwr_accounts = set()
+        self.dividends_elapsed = 0
         all_mwr_internal = set()
         tree = self.ledger.root_tree
         portfolios = []
@@ -89,7 +101,8 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
                 self.all_mwr_accounts, all_mwr_internal, 'mwr' in seen_cols, 'twr' in seen_cols)
 
         portfolios = [("All portfolios", (self._get_types(cols), [self.total]))] + portfolios
-        print(f"Done: Elaped: {time.time() - _t0:.2f} (mwr/twr: {self.irr.elapsed():.2f})")
+        print(f"Done: Elapsed: {time.time() - _t0:.2f} (mwr/twr: {self.irr.elapsed():.2f}, "
+              f"dividends: {self.dividends_elapsed: .2f})")
         return portfolios
 
     def parse_config(self):
@@ -213,14 +226,23 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
 
     def _process_dividends(self,account,currency):
         parent_name = ":".join(account.name.split(":")[:-1])
-        result = self.ledger.query_shell.execute_query("select SUM(CONVERT(COST(position),'"+
-        self.operating_currency+"')) AS dividends from HAS_ACCOUNT('"+currency+"') and \
-            HAS_ACCOUNT('"+parent_name+"') where LEAF(account) = 'Dividends'")
+        cache_key = (account.name, currency, self.ledger.end_date)
+        if cache_key in self.dividend_cache:
+            return self.dividend_cache[cache_key]
+        query = (
+            f"SELECT SUM(CONVERT(COST(position),'{self.operating_currency}')) AS dividends "
+            f"FROM HAS_ACCOUNT('{currency}') AND HAS_ACCOUNT('{parent_name}') WHERE LEAF(account) = 'Dividends'")
+        if self.ledger.end_date:
+            query += f" AND date < {self.ledger.end_date}"
+        start = time.time()
+        result = self.ledger.query_shell.execute_query(query)
+        self.dividends_elapsed += time.time() - start
         dividends = ZERO
         if len(result[2])>0:
             for row_cost in result[2]:
                 if len(row_cost.dividends.get_positions())==1:
                     dividends+=round(abs(row_cost.dividends.get_positions()[0].units.number),2)
+        self.dividend_cache[cache_key] = dividends
         return dividends
 
     def _process_node(self, node, dividends):
@@ -347,6 +369,9 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         return total
 
     def _calculate_irr_twr(self, patterns, internal, calc_mwr, calc_twr):
+        cache_key = (",".join(patterns), ",".join(internal), self.ledger.end_date, calc_mwr, calc_twr)
+        if cache_key in self.irr_cache:
+            return self.irr_cache[cache_key]
         mwr, twr = self.irr.calculate(
             patterns, internal_patterns=internal,
             start_date=None, end_date=self.ledger.end_date, mwr=calc_mwr, twr=calc_twr)
@@ -354,5 +379,6 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             mwr = round(100 * mwr, 2)
         if twr:
             twr = round(100 * twr, 2)
+        self.irr_cache[cache_key] = [mwr, twr]
         print(f'mwr: {mwr} twr: {twr}')
         return mwr, twr
