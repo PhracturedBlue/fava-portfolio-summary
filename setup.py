@@ -23,7 +23,6 @@ setup(
     install_requires=[
         'beancount>=2.3.4',
         'fava>=1.20',
-        'scipy',
     ],
     zip_safe=False,
     classifiers=[
