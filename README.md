@@ -22,8 +22,8 @@ In the beancount file, configure via:
 2000-01-01 custom "fava-extension" "fava_portfolio_summary" "{
     'metadata-key': 'portfolio',
     'account-groups': (
-        { 'name': 'cash', 'mwr': False },
-        'investment',
+        { 'name': 'cash', 'cols': ['balance', 'allocation'] },
+        { 'name': 'investment', 'mwr': False },
         'retirement-pretax',
         'retirement-roth'),
     'internal': (
@@ -36,7 +36,7 @@ In the beancount file, configure via:
 ```
   * `metadata-key`: Name of key used to group accounts
   * `account-groups`: Either a string or a dictionary with the `name` key identifying the name of the group
-    * If specified as a dictionary, the `ineternal`, `mwr` and `twr` keys can be specied on a per-group basis
+    * If specified as a dictionary, the `internal`, `mwr`, `twr`, and 'cols' keys can be specied on a per-group basis
   * `internal` (optional): List of regex patterns denoting 'internal' accounts that should be ignored for cash-flow purposes
     during MWRR/TWRR calculation.  More information about selecting internal accounts can be found
     [here](https://github.com/hoostus/portfolio-returns#external-vs-internal-cashflows)
@@ -44,6 +44,8 @@ In the beancount file, configure via:
     Possible values: (True, False, 'children') Defaults to *True*
   * `twr` (optional): Enable TWRR calculation for all accounts (can be overridden at the group level).
     Possible values: (True, False, 'children') Defaults to *False*
+  * `cols` (optional): Ordered list of columns to display.  Available columns:
+    `units`, `cost`, `balance`, `pnl`, `dividends`, `change`, `mwr`, `twr`, `allocation`
 
 Additionally each top-level account (that is to be displayed) needs to be marked with the appropriate group:
 ```

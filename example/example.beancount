@@ -4,7 +4,7 @@ option "operating_currency" "USD"
 2010-01-01 custom "fava-extension" "portfolio_summary" "{
     'metadata-key': 'portfolio',
     'account-groups': (
-        { 'name': 'cash', 'mwr': False, 'twr': False },
+        { 'name': 'cash', 'cols': ['balance', 'allocation']},
         'pretax',
         'roth'),
     'internal': ('.*:PnL',),
