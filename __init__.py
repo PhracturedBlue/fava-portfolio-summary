@@ -63,7 +63,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         any_twr = False
         portfolios = []
         _t0 = time.time()
-        self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency)
+        self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency, errors=self.ledger.errors)
         for key, pattern, internal, mwr, twr in self.parse_config():
             any_mwr |= bool(mwr)
             any_twr |= bool(twr)

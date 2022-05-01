@@ -8,7 +8,7 @@ It was originally licensed under the Parity Public License 7.0.
 This file is dual licensed under the Parity Public License 7.0 and the MIT License
 as permitted by the Parity Public License
 """
-# pylint: disable=logging-fstring-interpolation
+# pylint: disable=logging-fstring-interpolation broad-except
 import argparse
 import logging
 import sys
@@ -29,6 +29,7 @@ import beancount.core.getters
 import beancount.core.data
 import beancount.core.convert
 import beancount.parser
+from fava.helpers import BeancountError
 
 # https://github.com/peliot/XIRR-and-XNPV/blob/master/financial.py
 try:
@@ -97,20 +98,27 @@ def xirr(cashflows,guess=0.1):
     """
     try:
         return secant_method(lambda r: xnpv(r,cashflows),guess)
-    except:
-        logging.error("No solution found for IRR")
+    except Exception as _e:
+        logging.error("No solution found for IRR: %s", _e)
         return 0.0
 
-def xtwrr(periods):
+def xtwrr(periods, debug=False):
     """Calculate TWRR from a set of date-ordered periods"""
     dates = sorted(periods.keys())
     last = float(periods[dates[0]][0])
     mean = 1.0
+    if debug:
+        print("Date          start-balance     cashflow     end-balance     partial")
     for date in dates[1:]:
         cur_bal = float(periods[date][0])
         cashflow = float(periods[date][1])
+        partial = 1.0
+        # cashflow occurs on end date, so remove it from the current balance
         if last != 0:
-            mean *= 1 + (cur_bal - cashflow - last) / last
+            partial = 1 + ((cur_bal - cashflow) - last) / last
+        if debug:
+            print(f"{date.strftime('%Y-%m-%d')}  {last:-15.2f}  {cashflow:-11.2f}  {cur_bal:-14.2f}  {partial:-10.2f}")
+        mean *= partial
         last = cur_bal
     mean = mean - 1.0
     days = (dates[-1] - dates[0]).days
@@ -140,7 +148,7 @@ def add_position(position, inventory):
 class IRR:
     """Wrapper class to allow caching results of multiple calculations to improve performance"""
     # pylint: disable=too-many-instance-attributes
-    def __init__(self, entries, price_map, currency):
+    def __init__(self, entries, price_map, currency, errors=None):
         self.all_entries = entries
         self.price_map = price_map
         self.currency = currency
@@ -153,6 +161,12 @@ class IRR:
         self.internal = {}
         self.patterns = None
         self.internal_patterns = None
+        self.errors = errors
+
+    def _error(self, msg, meta=None):
+        if self.errors:
+            if not any(_.source == meta and _.message == msg and _.entry == None for _ in self.errors):
+                self.errors.append(BeancountError(meta, msg, None))
 
     def elapsed(self):
         """Elapsed time of all runs of calculate()"""
@@ -195,6 +209,13 @@ class IRR:
             value = date_cache.get(position)
             if not value:
                 value = beancount.core.convert.convert_position(position, self.currency, self.price_map, date)
+                if value.currency != self.currency:
+                    # try to convert position via cost
+                    if position.cost and position.cost.currency == self.currency:
+                        value = beancount.core.amount.Amount(position.cost.number * position.units.number,
+                                                             self.currency)
+                    else:
+                        continue
                 date_cache[position] = value
             balance.add_amount(value)
         amount = balance.get_currency_units(self.currency)
@@ -221,7 +242,8 @@ class IRR:
 
     def calculate(self, patterns, internal_patterns=None, start_date=None, end_date=None,
                   mwr=True, twr=False,
-                  cashflows=None, inflow_accounts=None, outflow_accounts=None):
+                  cashflows=None, inflow_accounts=None, outflow_accounts=None,
+                  debug_twr=False):
         """Calulate MWRR or TWRR for a set of accounts"""
         ## pylint: disable=too-many-branches too-many-statements too-many-locals too-many-arguments
         self.interesting.clear()
@@ -275,19 +297,32 @@ class IRR:
             #  Posting(account=Assets:Bank, amount=-100)]
             # should net out to $100
             # we loop over all postings in the entry. if the posting
-            # if for an account we care about e.g. Assets:Brokerage then
+            # is for an account we care about e.g. Assets:Brokerage then
             # we track the cashflow. But we *also* look for "internal"
             # cashflows and subtract them out. This will leave a net $0
             # if all the cashflows are internal.
-
             for posting in entry.postings:
-                converted = beancount.core.convert.convert_position(posting, self.currency, self.price_map, entry.date)
+                # convert_position uses the price-map to do price conversions, but this does not necessarily
+                # accurately represent the cost at transaction time (due to intra-day variations).  That
+                # could cause inacuracy, but since the cashflow is applied to the daily balance, it is more
+                # important to be consistent with values
+                converted = beancount.core.convert.convert_position(
+                    posting, self.currency, self.price_map, entry.date)
                 if converted.currency != self.currency:
-                    logging.error(f'Could not convert posting {converted} from {entry.date} at '
-                                  f'{posting.meta["filename"]}:{posting.meta["lineno"]} to {self.currency}. '
-                                   'IRR will be wrong.')
-                    continue
-                value = converted.number
+                    # If the price_map does not contain a valid price, see if it can be calculated from cost
+                    # This must align with get_value_as_of()
+                    if posting.cost and posting.cost.currency == self.currency:
+                        value = posting.cost.number * posting.units.number
+                    else:
+                        logging.error(f'Could not convert posting {converted} from {entry.date} at '
+                                      f'{posting.meta["filename"]}:{posting.meta["lineno"]} to {self.currency}. '
+                                       'IRR will be wrong.')
+                        self._error(
+                            f"Could not convert posting {converted} from {entry.date}, IRR will be wrong",
+                            posting.meta)
+                        continue
+                else:
+                    value = converted.number
 
                 if self.is_interesting_posting(posting):
                     cashflow += value
@@ -335,7 +370,7 @@ class IRR:
                 logging.error(f'No cashflows found during the time period {start_date} -> {end_date}')
         elapsed[6] = time.time()
         if twr and twrr_periods:
-            twrr = xtwrr(twrr_periods)
+            twrr = xtwrr(twrr_periods, debug=debug_twr)
         elapsed[7] = time.time()
         for i in range(7):
             delta = elapsed[i+1] - elapsed[i]
@@ -377,6 +412,8 @@ def main():
         help='Print list of all outflow accounts in transactions.')
     parser.add_argument('--debug-cashflows', action='store_true',
         help='Print list of all cashflows used for the IRR calculation.')
+    parser.add_argument('--debug-twr', action='store_true',
+        help='Print calculations for TWR.')
 
     args = parser.parse_args()
 
@@ -428,7 +465,8 @@ def main():
     irr, twr = IRR(entries, price_map, args.currency).calculate(
         args.account, internal_patterns=args.internal, start_date=args.date_from, end_date=args.date_to,
         mwr=True, twr=True,
-        cashflows=cashflows, inflow_accounts=inflow_accounts, outflow_accounts=outflow_accounts)
+        cashflows=cashflows, inflow_accounts=inflow_accounts, outflow_accounts=outflow_accounts,
+        debug_twr=args.debug_twr)
     if irr:
         print(f"IRR: {irr}")
     if twr:
