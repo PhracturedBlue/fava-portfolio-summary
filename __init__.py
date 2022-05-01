@@ -33,31 +33,38 @@ from .irr import IRR
 
 class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
     """Report out summary information for groups of portfolios"""
-    # pylint: disable=too-many-instance-attributes
 
     report_title = "Portfolio Summary"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.all_mwr_accounts = None
-        self.irr = None
-        self.total = None
-        self.operating_currency = None
-        self.irr_cache = {}
-        self.dividends_elapsed = 0
-        self.dividend_cache = {}
         self.accounts = None
-        self.all_cols = ["units", "cost", "balance", "pnl", "dividends", "change", "mwr", "twr", "allocation"]
+        self.irr_cache = {}
+        self.dividend_cache = {}
 
     def portfolio_accounts(self):
         """An account tree based on matching regex patterns."""
-
         if self.ledger.accounts is not self.accounts:
             # self.ledger.accounts should be reset every time the databse is loaded
             self.dividend_cache = {}
             self.irr_cache = {}
             self.accounts = self.ledger.accounts
+        portfolio_summary = PortfolioSummaryInstance(self.ledger, self.config, self.irr_cache, self.dividend_cache)
+        return portfolio_summary.run()
+
+class PortfolioSummaryInstance:  # pragma: no cover
+    """Thread-safe instance of Portfolio Summary"""
+    # pylint: disable=too-many-instance-attributes
+
+    def __init__(self, ledger, config, irr_cache, dividend_cache):
+        self.ledger = ledger
+        self.config = config
+        self.irr_cache = irr_cache
+        self.dividend_cache = dividend_cache
         self.operating_currency = self.ledger.options["operating_currency"][0]
+        self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency, errors=self.ledger.errors)
+        self.all_mwr_accounts = set()
+        self.dividends_elapsed = 0
         self.total = {
             'account': 'Total',
             'balance': ZERO,
@@ -70,14 +77,15 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             'children': [],
             'last-date':None
             }
-        self.all_mwr_accounts = set()
-        self.dividends_elapsed = 0
+        self.all_cols = ["units", "cost", "balance", "pnl", "dividends", "change", "mwr", "twr", "allocation"]
+
+    def run(self):
+        """Calculdate summary"""
         all_mwr_internal = set()
         tree = self.ledger.root_tree
         portfolios = []
         _t0 = time.time()
         seen_cols = {}  # Use a dict instead of a set to preserve order
-        self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency, errors=self.ledger.errors)
         for res in self.parse_config():
             if len(res) == 1:
                 cols = [_ for _ in res[0] if _ in seen_cols]
