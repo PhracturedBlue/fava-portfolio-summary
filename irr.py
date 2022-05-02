@@ -247,6 +247,8 @@ class IRR:
                   debug_twr=False):
         """Calulate MWRR or TWRR for a set of accounts"""
         ## pylint: disable=too-many-branches too-many-statements too-many-locals too-many-arguments
+        import os
+        print(f"Starting: {os.getpid()} {datetime.datetime.now()}")
         self.interesting.clear()
         self.internal.clear()
         self.inventory.clear()
@@ -377,6 +379,7 @@ class IRR:
             delta = elapsed[i+1] - elapsed[i]
             self.times[i] += delta
             # print(f"T{i}: delta")
+        print(f"Finished: {os.getpid()} {datetime.datetime.now()}")
         return irr, twrr
 
 def main():

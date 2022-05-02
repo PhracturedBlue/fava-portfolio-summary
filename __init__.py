@@ -17,6 +17,10 @@ import json
 import re
 import time
 from collections.abc import Iterable
+# from multiprocessing import Pool
+# from multiprocessing.pool import ThreadPool as Pool
+import multiprocessing
+from threading import Thread, Semaphore
 from xmlrpc.client import DateTime
 
 from beancount.core.number import Decimal
@@ -41,6 +45,7 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
         self.accounts = None
         self.irr_cache = {}
         self.dividend_cache = {}
+        self.pool = Semaphore(4)  # Pool()
 
     def portfolio_accounts(self):
         """An account tree based on matching regex patterns."""
@@ -49,22 +54,29 @@ class PortfolioSummary(FavaExtensionBase):  # pragma: no cover
             self.dividend_cache = {}
             self.irr_cache = {}
             self.accounts = self.ledger.accounts
-        portfolio_summary = PortfolioSummaryInstance(self.ledger, self.config, self.irr_cache, self.dividend_cache)
+        portfolio_summary = PortfolioSummaryInstance(self.ledger, self.config, self.irr_cache, self.dividend_cache, self.pool)
         return portfolio_summary.run()
+
+def double(i):
+    from os import getpid
+    print("I'm process", getpid())
+    return i * 2
 
 class PortfolioSummaryInstance:  # pragma: no cover
     """Thread-safe instance of Portfolio Summary"""
     # pylint: disable=too-many-instance-attributes
 
-    def __init__(self, ledger, config, irr_cache, dividend_cache):
+    def __init__(self, ledger, config, irr_cache, dividend_cache, pool):
         self.ledger = ledger
         self.config = config
         self.irr_cache = irr_cache
         self.dividend_cache = dividend_cache
+        self.pool = pool
         self.operating_currency = self.ledger.options["operating_currency"][0]
         self.irr = IRR(self.ledger.all_entries, g.ledger.price_map, self.operating_currency, errors=self.ledger.errors)
         self.all_mwr_accounts = set()
         self.dividends_elapsed = 0
+        self.jobs =  []
         self.total = {
             'account': 'Total',
             'balance': ZERO,
@@ -105,9 +117,10 @@ class PortfolioSummaryInstance:  # pragma: no cover
                                      (float(self.total['cost'])+.00001)) * 100, 2)
         self.total['pnl'] = round(float(self.total['balance'] - self.total['cost']), 2)
         if 'mwr' in seen_cols or 'twr' in seen_cols:
-            self.total['mwr'], self.total['twr'] = self._calculate_irr_twr(
-                self.all_mwr_accounts, all_mwr_internal, 'mwr' in seen_cols, 'twr' in seen_cols)
+            self._calculate_irr_twr(
+                self.total, self.all_mwr_accounts, all_mwr_internal, 'mwr' in seen_cols, 'twr' in seen_cols)
 
+        self._complete_jobs()
         portfolios = [("All portfolios", (self._get_types(cols), [self.total]))] + portfolios
         print(f"Done: Elapsed: {time.time() - _t0:.2f} (mwr/twr: {self.irr.elapsed():.2f}, "
               f"dividends: {self.dividends_elapsed: .2f})")
@@ -351,8 +364,8 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 parent['cost'] += row['cost']
                 parent['dividends'] += row['dividends']
                 if mwr == "children" or twr == "children":
-                    row['mwr'], row['twr'] = self._calculate_irr_twr(
-                        [row['account']], internal, mwr == "children", twr == "children")
+                    self._calculate_irr_twr(
+                        row, [row['account']], internal, mwr == "children", twr == "children")
                 parent['children'].append(row)
                 rows.append(row)
             total['balance'] += parent['balance']
@@ -361,7 +374,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
             if mwr or twr:
                 pattern = parent['account'] + '(:.*)?'
                 mwr_accounts.add(pattern)
-                parent['mwr'], parent['twr'] = self._calculate_irr_twr([pattern], internal, mwr, twr)
+                self._calculate_irr_twr(parent, [pattern], internal, mwr, twr)
 
         for row in rows:
             if "balance" in row and total['balance'] > 0:
@@ -372,21 +385,69 @@ class PortfolioSummaryInstance:  # pragma: no cover
         self.total['cost'] += total['cost']
         self.total['dividends'] += total['dividends']
         if mwr or twr:
-            total['mwr'], total['twr'] = self._calculate_irr_twr(mwr_accounts, internal, mwr, twr)
+            self._calculate_irr_twr(total, mwr_accounts, internal, mwr, twr)
             self.all_mwr_accounts |= mwr_accounts
         return total
 
-    def _calculate_irr_twr(self, patterns, internal, calc_mwr, calc_twr):
-        cache_key = (",".join(patterns), ",".join(internal), self.ledger.end_date, calc_mwr, calc_twr)
-        if cache_key in self.irr_cache:
-            return self.irr_cache[cache_key]
-        mwr, twr = self.irr.calculate(
-            patterns, internal_patterns=internal,
-            start_date=None, end_date=self.ledger.end_date, mwr=calc_mwr, twr=calc_twr)
+    def _complete_jobs(self):
+        import os
+        start = time.time()
+        for job in self.jobs:
+            job.join()
+        #for parent, cache_key, job in self.jobs:
+        #    os.waitpid(job, 0)
+        #    # self._complete_irr(parent, cache_key, job.get())
+        print(f"Waitpid: {time.time() - start:.2f} secs")
+
+    def _complete_irr(self, parent, cache_key, res):
+        mwr, twr = res
         if mwr:
             mwr = round(100 * mwr, 2)
         if twr:
             twr = round(100 * twr, 2)
         self.irr_cache[cache_key] = [mwr, twr]
         print(f'mwr: {mwr} twr: {twr}')
-        return mwr, twr
+        parent['mwr'], parent['twr'] = mwr, twr
+
+    def _calculate_irr_twr(self, parent, patterns, internal, calc_mwr, calc_twr):
+        import os
+        cache_key = (",".join(patterns), ",".join(internal), self.ledger.end_date, calc_mwr, calc_twr)
+        if cache_key in self.irr_cache:
+            parent['mwr'], parent['twr'] = self.irr_cache[cache_key]
+            return
+        kwargs = {
+           'internal_patterns': internal,
+           'start_date': None,
+           'end_date': self.ledger.end_date,
+           'mwr': calc_mwr,
+           'twr': calc_twr}
+        if self.pool:
+            print(f"Launching mwr/twr {datetime.now()}")
+            queue = multiprocessing.SimpleQueue()
+            tid = Thread(target=self.fork_func, args=(parent, cache_key, queue, [patterns], kwargs))
+            tid.start()
+            self.jobs.append(tid)
+            # self.jobs.append(
+            #     (parent, cache_key, pid))
+            #     # self.pool.apply_async(self.irr.calculate, (patterns,), kwargs)))
+        else:
+            self._complete_irr(parent, cache_key, self.irr.calculate(patterns, **kwargs))
+
+    def fork_func(self, parent, cache_key, queue, args, kwargs):
+        import os
+        with self.pool:
+            pid = os.fork()
+            if pid == 0:
+                import psutil
+                for conn in psutil.net_connections():
+                    try:
+                        os.close(conn.fd)
+                    except:
+                        pass
+                res = self.irr.calculate(*args, **kwargs)
+                queue.put(res) 
+                os._exit(0)
+            os.waitpid(pid, 0)
+        if not queue.empty():
+            res = queue.get()
+            self._complete_irr(parent, cache_key, res)
