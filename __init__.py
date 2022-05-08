@@ -109,7 +109,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
                     row_copy = row.copy()
                     row_copy['account'] = title
                     row_copy['allocation'] = round(100*(float(row['balance'])/float(self.total['balance'])),2)
-                    row_copy['children']
+                    row_copy['children'] = []
                     portfolio_summary.append(row_copy)
         self.total['children'] = portfolio_summary
 
