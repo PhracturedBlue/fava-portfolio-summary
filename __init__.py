@@ -82,7 +82,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
     def run(self):
         """Calculdate summary"""
         all_mwr_internal = set()
-        tree = self.ledger.root_tree
+        tree = g.filtered.root_tree
         portfolios = []
         _t0 = time.time()
         seen_cols = {}  # Use a dict instead of a set to preserve order
@@ -234,14 +234,14 @@ class PortfolioSummaryInstance:  # pragma: no cover
 
     def _process_dividends(self,account,currency):
         parent_name = ":".join(account.name.split(":")[:-1])
-        cache_key = (account.name, currency, self.ledger.end_date)
+        cache_key = (account.name, currency,g.filtered.end_date)
         if cache_key in self.dividend_cache:
             return self.dividend_cache[cache_key]
         query = (
             f"SELECT SUM(CONVERT(COST(position),'{self.operating_currency}')) AS dividends "
             f"FROM HAS_ACCOUNT('{currency}') AND HAS_ACCOUNT('{parent_name}') WHERE LEAF(account) = 'Dividends'")
-        if self.ledger.end_date:
-            query += f" AND date < {self.ledger.end_date}"
+        if g.filtered.end_date:
+            query += f" AND date < {g.filtered.end_date}"
         start = time.time()
         result = self.ledger.query_shell.execute_query(query)
         self.dividends_elapsed += time.time() - start
@@ -262,7 +262,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
         row["last-date"] = None
         row['pnl'] = ZERO
         row['dividends'] = ZERO
-        date=self.ledger.end_date
+        date = g.filtered.end_date
         balance = cost_or_value(node.balance, "at_value", g.ledger.price_map, date=date)
         cost = cost_or_value(node.balance, "at_cost", g.ledger.price_map, date=date)
         #### ADD Units to the report
@@ -305,7 +305,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
         ### GET LAST CURRENCY PRICE DATE
         if row_currency is not None and row_currency != self.operating_currency:
             try:
-                dict_dates = g.ledger.prices(self.operating_currency,row_currency)
+                dict_dates = g.filtered.prices(self.operating_currency,row_currency)
                 if len(dict_dates) >0:
                     row["last-date"] = dict_dates[-1][0]
             except KeyError:
@@ -377,12 +377,12 @@ class PortfolioSummaryInstance:  # pragma: no cover
         return total
 
     def _calculate_irr_twr(self, patterns, internal, calc_mwr, calc_twr):
-        cache_key = (",".join(patterns), ",".join(internal), self.ledger.end_date, calc_mwr, calc_twr)
+        cache_key = (",".join(patterns), ",".join(internal), g.filtered.end_date, calc_mwr, calc_twr)
         if cache_key in self.irr_cache:
             return self.irr_cache[cache_key]
         mwr, twr = self.irr.calculate(
             patterns, internal_patterns=internal,
-            start_date=None, end_date=self.ledger.end_date, mwr=calc_mwr, twr=calc_twr)
+            start_date=None, end_date=g.filtered.end_date, mwr=calc_mwr, twr=calc_twr)
         if mwr:
             mwr = round(100 * mwr, 2)
         if twr:
