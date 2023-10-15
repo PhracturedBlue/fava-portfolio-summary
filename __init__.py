@@ -24,7 +24,7 @@ from beancount.core.number import ZERO
 from beancount.core.data import Transaction
 
 from fava.ext import FavaExtensionBase
-from fava.helpers import FavaAPIException
+from fava.helpers import FavaAPIError
 from fava.core.conversion import cost_or_value
 from fava.core.query_shell import QueryShell
 from fava.context import g
@@ -96,7 +96,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 title, portfolio = self._account_metadata_pattern(
                     tree, key, pattern, internal, mwr, twr, "dividends" in cols)
             except Exception as _e:
-                # We re-raise to prevent masking the error.  Should this be a FavaAPIException?
+                # We re-raise to prevent masking the error.  Should this be a FavaAPIError?
                 raise Exception from _e
             all_mwr_internal |= internal
             portfolios.append((title, (self._get_types(cols), [portfolio])))
@@ -118,33 +118,33 @@ class PortfolioSummaryInstance:  # pragma: no cover
         # pylint: disable=unsubscriptable-object not-an-iterable unsupported-membership-test
         keys = ('metadata-key', 'account-groups', 'internal', 'mwr', 'twr', 'dividends', 'cols')
         if not isinstance(self.config, dict):
-            raise FavaAPIException("Portfolio List: Config should be a dictionary.")
+            raise FavaAPIError("Portfolio List: Config should be a dictionary.")
         for key in ('metadata-key', 'account-groups'):
             if key not in self.config:
-                raise FavaAPIException(f"Portfolio List: '{key}' is required key.")
+                raise FavaAPIError(f"Portfolio List: '{key}' is required key.")
         for key in self.config:
             if key not in keys:
-                raise FavaAPIException(f"Portfolio List: '{key}' is an invalid key.")
+                raise FavaAPIError(f"Portfolio List: '{key}' is an invalid key.")
         internal = self.config.get('internal', set())
         if isinstance(internal, (tuple, list)):
             internal = set(internal)
         elif not isinstance(internal, set):
-            raise FavaAPIException("Portfolio List: 'internal' must be a list.")
+            raise FavaAPIError("Portfolio List: 'internal' must be a list.")
         cols = self.config.get('cols', self.all_cols.copy())
         for col in cols:
             if col not in self.all_cols:
-                raise FavaAPIException(f"Portfolio List: '{col}' is not a valid column. "
+                raise FavaAPIError(f"Portfolio List: '{col}' is not a valid column. "
                                        f"Must be one of {self.all_cols}")
         mwr = self.config.get('mwr', 'mwr' in cols)
         # twr and dividends are expensive to calculate, so default to disabled
         twr = self.config.get('twr', 'twr' in self.config.get('cols', []))
         dividends = self.config.get('dividends', 'dividends' in self.config.get('cols', []))
         if isinstance(mwr, str) and mwr != "children":
-            raise FavaAPIException("Portfolio List: 'mwr' must be one of (True, False, 'children')")
+            raise FavaAPIError("Portfolio List: 'mwr' must be one of (True, False, 'children')")
         if isinstance(twr, str) and twr != "children":
-            raise FavaAPIException("Portfolio List: 'twr' must be one of (True, False, 'children')")
+            raise FavaAPIError("Portfolio List: 'twr' must be one of (True, False, 'children')")
         if isinstance(dividends, str):
-            raise FavaAPIException("Portfolio List: 'dividends' must be one of (True, False)")
+            raise FavaAPIError("Portfolio List: 'dividends' must be one of (True, False)")
 
         for group in self.config['account-groups']:
             yield self.config['metadata-key'], *self._parse_group(group, internal, cols, mwr, twr, dividends)
@@ -162,11 +162,11 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 grp_dividends = group.get('dividends', dividends if 'dividends' in cols else False)
                 for col in cols:
                     if col not in self.all_cols:
-                        raise FavaAPIException(f"Portfolio List: '{col}' is not a valid column. "
+                        raise FavaAPIError(f"Portfolio List: '{col}' is not a valid column. "
                                                f"Must be one of {self.all_cols}")
                 group = group['name']
             except Exception as _e:
-                raise FavaAPIException(f"Portfolio List: Error parsing group {str(group)}: {str(_e)}") from _e
+                raise FavaAPIError(f"Portfolio List: Error parsing group {str(group)}: {str(_e)}") from _e
         else:
             grp_mwr = mwr
             grp_twr = twr
