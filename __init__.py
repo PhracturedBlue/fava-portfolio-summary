@@ -101,6 +101,18 @@ class PortfolioSummaryInstance:  # pragma: no cover
             all_mwr_internal |= internal
             portfolios.append((title, (self._get_types(cols), [portfolio])))
 
+        #Adds allocation for each portfolio under All portfolios
+        portfolio_summary = []
+        for title, portfolio_data in portfolios:
+            for row in portfolio_data[1]:
+                if row['account'] == 'Total':
+                    row_copy = row.copy()
+                    row_copy['account'] = title
+                    row_copy['allocation'] = round(100*(float(row['balance'])/float(self.total['balance'])),2)
+                    row_copy['children'] = []
+                    portfolio_summary.append(row_copy)
+        self.total['children'] = portfolio_summary
+
         self.total['change'] = round((float(self.total['balance'] - self.total['cost']) /
                                      (float(self.total['cost'])+.00001)) * 100, 2)
         self.total['pnl'] = round(float(self.total['balance'] - self.total['cost']), 2)
