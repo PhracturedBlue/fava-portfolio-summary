@@ -30,6 +30,7 @@ import beancount.core.data
 import beancount.core.convert
 import beancount.parser
 from fava.helpers import BeancountError
+from fava.beans.prices import FavaPriceMap
 import fava.core.conversion
 import fava.core.inventory
 
@@ -221,7 +222,7 @@ class IRR:
                         continue
                 date_cache[position] = value
             balance.add_amount(value)
-        amount = fava.core.conversion.units(balance)
+        amount = fava.core.conversion.cost_or_value(balance, "units", self.price_map, date)
         return amount.get(self.currency, Decimal('0.00'))
 
     def is_interesting_posting(self, posting):
@@ -463,7 +464,10 @@ def main():
         args.date_to = today
 
     entries, _errors, _options = beancount.loader.load_file(args.bean, logging.info, log_errors=sys.stderr)
-    price_map = beancount.core.prices.build_price_map(entries)
+    # fava.core.conversion expects a FavaPriceMap (as Fava itself passes via
+    # g.ledger.prices); beancount's PriceMap has no get_price() and crashes.
+    price_map = FavaPriceMap(
+        entry for entry in entries if isinstance(entry, beancount.core.data.Price))
 
     cashflows = []
     inflow_accounts = set()
