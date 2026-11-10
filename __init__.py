@@ -298,8 +298,13 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 f"WHERE currency = '{row_currency}' AND account ='{node.name}' "
                 "ORDER BY currency, cost_date")
             for row_cost,row_value in result.rows:
-                total_currency_cost+=row_cost.number
-                total_currency_value+=row_value.number
+                # Positions with no cost (e.g. plain cash postings) or no
+                # usable price convert to None; skip those rows instead of
+                # crashing the whole report.
+                if row_cost is not None:
+                    total_currency_cost+=row_cost.number
+                if row_value is not None:
+                    total_currency_value+=row_value.number
             row["balance"] = round(total_currency_value, 2)
             row["cost"] = round(total_currency_cost, 2)
 
