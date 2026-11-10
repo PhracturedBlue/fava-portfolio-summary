@@ -77,7 +77,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
             'children': [],
             'last-date':None
             }
-        self.all_cols = ["units", "cost", "balance", "pnl", "dividends", "change", "mwr", "twr", "allocation"]
+        self.all_cols = ["units", "cost", "balance", "pnl", "dividends", "change", "mwr", "twr", "allocation", "allocation-parent"]
 
     def run(self):
         """Calculdate summary"""
@@ -192,6 +192,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
             "mwr":  'Percent',
             "twr":  'Percent',
             "allocation":  'Percent',
+            "allocation-parent":  'Percent',
         }
         types = []
         types.append(("account", str(str)))
@@ -368,6 +369,19 @@ class PortfolioSummaryInstance:  # pragma: no cover
                 row["allocation"] = round((row["balance"] / total['balance']) * 100, 2)
                 row["change"] = round((float(row['balance'] - row['cost']) / (float(row['cost'])+.00001)) * 100, 2)
                 row["pnl"] = round(float(row['balance'] - row['cost']),2)
+
+        # Allocation relative to the row's parent row in the tree:
+        # top-level accounts are relative to the group total,
+        # sub-accounts to their parent account.
+        def _set_alloc_parent(row, parent_balance):
+            if parent_balance and row.get('balance'):
+                row['allocation-parent'] = round(
+                    (row['balance'] / parent_balance) * 100, 2)
+            for child_row in row['children']:
+                _set_alloc_parent(child_row, row.get('balance') or ZERO)
+        for top_row in total['children']:
+            _set_alloc_parent(top_row, total['balance'])
+
         self.total['balance'] += total['balance']
         self.total['cost'] += total['cost']
         self.total['dividends'] += total['dividends']
