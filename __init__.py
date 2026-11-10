@@ -218,6 +218,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
         accounts = self.ledger.all_entries_by_type.Open
         accounts = sorted(accounts, key=lambda x: x.account)
         last_seen = None
+        blocked = None
         for entry in accounts:
             if entry.account not in tree:
                 continue
@@ -226,8 +227,18 @@ class PortfolioSummaryInstance:  # pragma: no cover
             ):
                 selected_accounts.append({'account': tree[entry.account], 'children': []})
                 last_seen = entry.account + ':'
+                blocked = None
+            elif blocked and entry.account.startswith(blocked):
+                # Inside the subtree of an account that is tagged for a
+                # different portfolio; none of it belongs to this group.
+                continue
             elif last_seen and entry.account.startswith(last_seen):
-                selected_accounts[-1]['children'].append(tree[entry.account])
+                if metadata_key in entry.meta:
+                    # Explicitly tagged for another portfolio: do not
+                    # absorb it, or its subtree, as a child of this group.
+                    blocked = entry.account + ':'
+                else:
+                    selected_accounts[-1]['children'].append(tree[entry.account])
 
         portfolio_data = self._portfolio_data(selected_accounts, internal, mwr, twr, dividends)
         return title, portfolio_data
