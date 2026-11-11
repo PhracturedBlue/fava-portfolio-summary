@@ -225,7 +225,8 @@ class PortfolioSummaryInstance:  # pragma: no cover
             if (metadata_key in entry.meta) and (
                 regexer.match(entry.meta[metadata_key]) is not None
             ):
-                selected_accounts.append({'account': tree[entry.account], 'children': []})
+                selected_accounts.append({'account': tree[entry.account], 'children': [],
+                                    'return_accounts': [entry.account]})
                 last_seen = entry.account + ':'
                 blocked = None
             elif blocked and entry.account.startswith(blocked):
@@ -239,6 +240,7 @@ class PortfolioSummaryInstance:  # pragma: no cover
                     blocked = entry.account + ':'
                 else:
                     selected_accounts[-1]['children'].append(tree[entry.account])
+                    selected_accounts[-1]['return_accounts'].append(entry.account)
 
         portfolio_data = self._portfolio_data(selected_accounts, internal, mwr, twr, dividends)
         return title, portfolio_data
@@ -376,9 +378,18 @@ class PortfolioSummaryInstance:  # pragma: no cover
             total['cost'] += parent['cost']
             total['dividends'] += parent['dividends']
             if mwr or twr:
-                pattern = parent['account'] + '(:.*)?'
-                mwr_accounts.add(pattern)
-                parent['mwr'], parent['twr'] = self._calculate_irr_twr([pattern], internal, mwr, twr)
+                # Returns cover this parent's whole subtree except any
+                # subtree tagged for a different portfolio (such as
+                # IB:Cash): those accounts belong to that portfolio's
+                # returns, not this parent's.  Untagged descendants feed
+                # the returns even when they are not listed as rows (a
+                # sold-out account drops out of the tree, but its history
+                # still counts).
+                return_accounts = node.get('return_accounts') or (
+                    [parent['account']] + [r['account'] for r in parent['children']])
+                patterns = [re.escape(account) for account in return_accounts]
+                mwr_accounts.update(patterns)
+                parent['mwr'], parent['twr'] = self._calculate_irr_twr(patterns, internal, mwr, twr)
 
         for row in rows:
             if "balance" in row and total['balance'] > 0:
